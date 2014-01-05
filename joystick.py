@@ -12,7 +12,7 @@ ON_POSIX = 'posix' in sys.builtin_module_names
 
 
 #Define relevant variables
-controller_port = 'COM14'
+controller_port = 'COM7'
 controller_rate = 9600
 printer_port = 'COM5'
 printer_rate = 250000
@@ -38,7 +38,7 @@ def read_stdout(queue):
 	else: # got line
 		return line
 
-def run_command(proc,command,delay):
+def run_command(proc,command,delay=0.1):
 	command = "\n" + command + "\n"
 	proc.stdin.write(command)
 	proc.stdin.flush()
@@ -56,24 +56,24 @@ def pronsole_healthcheck(proc):
 
 def basic_parse(line):
 	"""simple line parser for giving basic instructions, testing"""
-	raw_x,raw_y = line.split(";")
+	raw_y,raw_x = line.split(";")
 	x = int(raw_x.strip())
 	y = int(raw_y.strip())
 
-	output = (0,0,0)
+	output = [0,0,0]
 
-	if (previosvaluered - fudfactor ) < sensorvaluered < (previosvaluered + dead):
+	if (home - dead ) < x < (home + dead):
 		pass
 	elif x > (home + dead):
-		output[0] = 10
-	elif x < (output - dead):
 		output[0] = -10
+	elif x < (home - dead):
+		output[0] = 10
 		
 	if (home - dead ) < y < (home + dead):
 		pass
 	elif y > (home + dead):
 		output[1] = 10
-	elif y < (output - dead):
+	elif y < (home - dead):
 		output[1] = -10
 
 	return output
@@ -94,13 +94,14 @@ def parse_input(line):
 	return (x,y,magnitude)
 
 def setup_printer(proc):
-	run_command(proc,"G28",30) # home the printer
-	run_command(proc,"G0 Z100 F5000", 30)
-	run_command(proc,"G91")
+	run_command(proc,"G28",15) # home the printer
+	run_command(proc,"G0 Z100 F5000", 15)
+	run_command(proc,"G91",0.1)
 
 #setup serial connections
 
 #set up controller read loop
+print "Setting up serial connections"
 try:
 	conn = serial.Serial(controller_port, controller_rate)
 except serial.serialutil.SerialException:
@@ -108,8 +109,10 @@ except serial.serialutil.SerialException:
 	sys.exit(1)
 
 #set up pronsole subprocess and non-blocking pipes
+print "opening pronsole console"
 proc = Popen(['pronsole\pronsole.exe']
 	 ,stdout=PIPE
+	 ,stderr=PIPE
 	 ,stdin=PIPE
 	 ,bufsize=1
 	 ,close_fds=ON_POSIX)
@@ -119,22 +122,26 @@ q = Queue()
 t = Thread(target=enqueue_output, args=(proc.stdout, q))
 t.daemon = True # thread dies with the program
 t.start()
-run_command(proc,"connect %s %s"%(port,rate))
+print "connecting to reprap via pronsole"
+run_command(proc,"connect %s %s"%(printer_port,printer_rate),1)
 time.sleep(3)
 
-setup_printer()
+print "homing printer"
+setup_printer(proc)
 #main loop
+print "entering main loop"
 while True:
-	if conn.isAvailible() > 0:
+	if conn.inWaiting() > 0:
 		line = conn.readline()
 		moves = basic_parse(line)
-		run_command(proc,"G0 X%d Y%d Z%d F 5000" % moves)
+		run_command(proc,"G0 X%d Y%d Z%d F 2500" % (moves[0],moves[1],moves[2]))
 		time.sleep(0.25)
 	else:
 		time.sleep(0.25)
 		
 
 #clean up before exit
+print "exiting"
 run_commmand(proc,"disconnect",0.5)
 run_commmand(proc,"exit",0.5)
 conn.close()
