@@ -1,5 +1,5 @@
 import serial, sys, time
-from subprocess import PIPE, Popen
+from subprocess import PIPE, Popen,check_call
 from threading import Thread
 from math import sqrt
 
@@ -21,8 +21,9 @@ sleep_time = 0.5
 
 home = 500
 dead = 25
-#define convenience methods
+image_count = 0
 
+#define convenience methods
 def enqueue_output(out, queue):
     """used to prevent blocking on reading from an empty process stdout"""
     for line in iter(out.readline, b''):
@@ -61,6 +62,9 @@ def basic_parse(line):
 	y = int(raw_y.strip())
 
 	output = [0,0,0]
+	if x == -1 and y == -1:
+		take_image()
+		return output
 
 	if (home - dead ) < x < (home + dead):
 		pass
@@ -77,13 +81,21 @@ def basic_parse(line):
 		output[1] = -10
 
 	return output
-
+def take_image():
+	global image_count
+	image_path = "C:\\Image"
+	image_name = "MicroscopeImage-%d" % image_count
+	print "Taking snapshot: %s" % image_name
+	image_count += 1
+	command = "vlc.exe --dshow-vdev=\"Digital Microscope Camera\" --dshow-size=640x480 -V dummy --intf=dummy --dummy-quiet --video-filter=scene --no-audio --scene-path=%s --scene-format=jpeg --scene-prefix=%s --scene-replace --run-time=1 --scene-ratio=24 \"dshow://\" vlc://quit" % (image_path,image_name)
+	proc = Popen(command,shell=True,cwd='C:\\Program Files (x86)\\VideoLAN\VLC\\')
+	
 def parse_input(line):
 	"""takes a line, parses it and returns a tuple of (x,y,move_speed)"""
 	raw_x,raw_y = line.split(";")
 
-	x = float(raw_x.strip()) - 500
-	y = float(raw_y.strip()) - 500
+	x = float(raw_x.strip()) - home
+	y = float(raw_y.strip()) - home
 
 	ratio = y/x
 	magnitude = sqrt(x**2 + y**2)
