@@ -19,9 +19,11 @@ printer_rate = 250000
 
 sleep_time = 0.5
 
-home = 500
-dead = 25
-image_count = 0
+home = 500 #zero position of the joystick
+dead = 25 #ignore how much movement around the zero position?
+step_size = 1 #move how much each step
+z_step_size = 40
+image_count = 1  #start image numbering from 1
 
 #define convenience methods
 def enqueue_output(out, queue):
@@ -57,11 +59,21 @@ def pronsole_healthcheck(proc):
 
 def basic_parse(line):
 	"""simple line parser for giving basic instructions, testing"""
-	raw_y,raw_x = line.split(";")
+	global step_size, z_step_size
+
+	raw_y,raw_x,raw_z = line.split(";")
+
 	x = int(raw_x.strip())
 	y = int(raw_y.strip())
+	z = int(raw_z.strip())
 
 	output = [0,0,0]
+	if z != 0:
+		if z == 1:
+			output[2] = z_step_size
+		elif z == -1:
+			output[2] = z_step_size * -1
+
 	if x == -1 and y == -1:
 		take_image()
 		return output
@@ -69,19 +81,21 @@ def basic_parse(line):
 	if (home - dead ) < x < (home + dead):
 		pass
 	elif x > (home + dead):
-		output[0] = -10
+		output[0] = step_size*-1
 	elif x < (home - dead):
-		output[0] = 10
-		
+		output[0] = step_size
+
 	if (home - dead ) < y < (home + dead):
 		pass
 	elif y > (home + dead):
-		output[1] = 10
+		output[1] = step_size
 	elif y < (home - dead):
-		output[1] = -10
+		output[1] = step_size * -1
 
 	return output
+
 def take_image():
+	"""runs a vlc command that captures an image from the microscope device"""
 	global image_count
 	image_path = "C:\\Image"
 	image_name = "MicroscopeImage-%d" % image_count
