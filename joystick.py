@@ -105,9 +105,16 @@ def parse_input(line):
 	#this is wrong, but only here for demonstration purposes
 	return (x,y,magnitude)
 
+def wait_til_ready(proc):
+	ready = False
+	while not ready:
+		ready = pronsole_healthcheck(proc)
+
 def setup_printer(proc):
-	run_command(proc,"G28",15) # home the printer
-	run_command(proc,"G0 Z100 F5000", 15)
+	run_command(proc,"G28",1) # home the printer
+	wait_til_ready(proc)
+	run_command(proc,"G0 Z100 F5000", 1)#move print head to start height
+	wait_til_ready(proc)
 	run_command(proc,"G91",0.1)
 
 #setup serial connections
