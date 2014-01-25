@@ -3,6 +3,7 @@ from subprocess import PIPE, Popen,check_call
 from threading import Thread
 from math import sqrt
 
+
 try:
     from Queue import Queue, Empty
 except ImportError:
@@ -19,11 +20,9 @@ printer_rate = 250000
 
 sleep_time = 0.5
 
-home = 500 #zero position of the joystick
-dead = 25 #ignore how much movement around the zero position?
-step_size = 1 #move how much each step
-z_step_size = 40
-image_count = 1  #start image numbering from 1
+home = 500
+dead = 25
+image_count = 0
 
 #define convenience methods
 def enqueue_output(out, queue):
@@ -57,45 +56,28 @@ def pronsole_healthcheck(proc):
 			return True
 	return False
 
-def basic_parse(line):
+def scale_function(number):
+	return 0.003*number**2
+
+def parse_input(line):
 	"""simple line parser for giving basic instructions, testing"""
-	global step_size, z_step_size
-
-	raw_y,raw_x,raw_z = line.split(";")
-
+	raw_y,raw_x = line.split(";")
 	x = int(raw_x.strip())
 	y = int(raw_y.strip())
-	z = int(raw_z.strip())
 
 	output = [0,0,0]
-	if z != 0:
-		if z == 1:
-			output[2] = z_step_size
-		elif z == -1:
-			output[2] = z_step_size * -1
-
 	if x == -1 and y == -1:
 		take_image()
 		return output
 
-	if (home - dead ) < x < (home + dead):
+	if (home - dead ) < x < (home + dead) and (home - dead ) < y < (home + dead):
 		pass
-	elif x > (home + dead):
-		output[0] = step_size*-1
-	elif x < (home - dead):
-		output[0] = step_size
-
-	if (home - dead ) < y < (home + dead):
-		pass
-	elif y > (home + dead):
-		output[1] = step_size
-	elif y < (home - dead):
-		output[1] = step_size * -1
+	else:
+		output = [scale_function(x),scale_function(y),0]
 
 	return output
 
 def take_image():
-	"""runs a vlc command that captures an image from the microscope device"""
 	global image_count
 	image_path = "C:\\Image"
 	image_name = "MicroscopeImage-%d" % image_count
@@ -104,21 +86,6 @@ def take_image():
 	command = "vlc.exe --dshow-vdev=\"Digital Microscope Camera\" --dshow-size=640x480 -V dummy --intf=dummy --dummy-quiet --video-filter=scene --no-audio --scene-path=%s --scene-format=jpeg --scene-prefix=%s --scene-replace --run-time=1 --scene-ratio=24 \"dshow://\" vlc://quit" % (image_path,image_name)
 	proc = Popen(command,shell=True,cwd='C:\\Program Files (x86)\\VideoLAN\VLC\\')
 	
-def parse_input(line):
-	"""takes a line, parses it and returns a tuple of (x,y,move_speed)"""
-	raw_x,raw_y = line.split(";")
-
-	x = float(raw_x.strip()) - home
-	y = float(raw_y.strip()) - home
-
-	ratio = y/x
-	magnitude = sqrt(x**2 + y**2)
-
-	#TODO this depends on indended behavior of the joystick
-
-	#this is wrong, but only here for demonstration purposes
-	return (x,y,magnitude)
-
 def setup_printer(proc):
 	run_command(proc,"G28",15) # home the printer
 	run_command(proc,"G0 Z100 F5000", 15)
@@ -159,7 +126,7 @@ print "entering main loop"
 while True:
 	if conn.inWaiting() > 0:
 		line = conn.readline()
-		moves = basic_parse(line)
+		moves = parse_input(line)
 		run_command(proc,"G0 X%d Y%d Z%d F 2500" % (moves[0],moves[1],moves[2]))
 		time.sleep(0.25)
 	else:
