@@ -20,7 +20,7 @@ printer_rate = 250000
 
 sleep_time = 0.5
 
-home = 500
+home = 0
 dead = 25
 image_count = 0
 
@@ -62,15 +62,15 @@ def scale_function(number):
 def parse_input(line):
 	"""simple line parser for giving basic instructions, testing"""
 	raw_y,raw_x = line.split(";")
-	x = int(raw_x.strip())
-	y = int(raw_y.strip())
+	x = int(raw_x.strip()) - 500
+	y = int(raw_y.strip()) - 500
 
 	output = [0,0,0]
 	if x == -1 and y == -1:
 		take_image()
 		return output
 
-	if (home - dead ) < x < (home + dead) and (home - dead ) < y < (home + dead):
+	if ((home - dead ) < x < (home + dead)) and ((home - dead ) < y < (home + dead)):
 		pass
 	else:
 		output = [scale_function(x),scale_function(y),0]
